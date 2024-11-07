@@ -1,30 +1,33 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 import fitz  # PyMuPDF
 import os
 
 app = Flask(__name__)
 
-# Route pour envoyer un fichier PDF avec une requête POST
+# Chemin vers le répertoire où les fichiers PDF sont stockés
+PDF_FOLDER = 'pdf_files'
+
+# Route pour téléverser et extraire le texte d'un fichier PDF
 @app.route('/upload_pdf', methods=['POST'])
 def upload_pdf():
     if 'pdf_file' not in request.files:
         return jsonify({"error": "Aucun fichier PDF trouvé"}), 400
     
     pdf_file = request.files['pdf_file']
-    pdf_path = os.path.join('pdf_files', pdf_file.filename)
+    pdf_path = os.path.join(PDF_FOLDER, pdf_file.filename)
     pdf_file.save(pdf_path)
     
     text_content = extract_text_from_pdf(pdf_path)
     return jsonify({"text": text_content})
 
-# Route pour obtenir le texte d'un PDF avec une requête GET
+# Route pour obtenir le texte d'un PDF existant
 @app.route('/get_pdf_text', methods=['GET'])
 def get_pdf_text():
     pdf_name = request.args.get('filename')
     if not pdf_name:
         return jsonify({"error": "Aucun nom de fichier spécifié"}), 400
     
-    pdf_path = os.path.join('pdf_files', pdf_name)
+    pdf_path = os.path.join(PDF_FOLDER, pdf_name)
     
     if not os.path.exists(pdf_path):
         return jsonify({"error": "Le fichier PDF spécifié n'existe pas"}), 404
@@ -32,7 +35,20 @@ def get_pdf_text():
     text_content = extract_text_from_pdf(pdf_path)
     return jsonify({"text": text_content})
 
-# Fonction pour extraire le texte d'un PDF avec PyMuPDF
+# Route pour télécharger un fichier PDF
+@app.route('/download_pdf', methods=['GET'])
+def download_pdf():
+    pdf_name = request.args.get('filename')
+    if not pdf_name:
+        return jsonify({"error": "Aucun nom de fichier spécifié"}), 400
+    
+    if not os.path.exists(os.path.join(PDF_FOLDER, pdf_name)):
+        return jsonify({"error": "Le fichier PDF spécifié n'existe pas"}), 404
+    
+    # Envoie le fichier directement en pièce jointe
+    return send_from_directory(PDF_FOLDER, pdf_name, as_attachment=True)
+
+# Fonction pour extraire le texte d'un PDF
 def extract_text_from_pdf(pdf_path):
     text = ""
     with fitz.open(pdf_path) as pdf:
